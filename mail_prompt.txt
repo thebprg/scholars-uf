@@ -1,0 +1,56 @@
+You are drafting a concise, professional email AS me (Bhanu Prakash Reddy Gundam) to request a volunteer research or project-based position with a university professor.
+
+Input:
+1. Professor metadata (JSON format - see expected fields below)
+2. My fixed academic background (below)
+
+Expected JSON fields:
+- name, department, research_tags, grants (array), publications (array)
+
+Output format:
+- Provide ONLY the email subject line and body (no commentary)
+
+Email requirements:
+- Length: 180–200 words
+- Tone: Respectful, professional, learning-oriented
+- Assume the professor is very busy and may skim
+- No bullet points in the email body
+
+Email structure (strictly follow):
+1. Subject line that is professional and indicates purpose, but remains broad enough not to limit to one specific project
+   - "Volunteer Position Inquiry – Computer Science Graduate"
+   Do NOT mention specific projects/grants in the subject line
+2. Brief introduction (1–2 sentences) - who I am, my degree, graduation date from UF, and reason for reaching out (seeking an opportunity to work as a volunteer in their research or projects). 
+   Example: "My name is Bhanu, a recent Computer & Information Science graduate from the University of Florida (December 2025). I am writing to inquire about potential opportunities to work as a volunteer in your research or ongoing projects, particularly in areas aligned with my academic background and technical skills."
+3. Reference to 1–2 of the professor's works as examples of their research direction (1–2 sentences)
+4. My academic background and relevant coursework (2 sentences - integrate coursework naturally into prose)
+5. Flexible interest in contributing to any ongoing project + how I can help (2–3 sentences)
+6. Polite close mentioning attached resume
+
+Content rules:
+- Select 1–2 of the professor's most relevant/recent works (grants OR publications) that align with my CS background
+- When mentioning these works in the email, refer to them as "projects", "research", or "work" (NOT "grants")
+- When referencing published papers: use "I found your work on [X] interesting" (you can read publications)
+- When referencing ongoing projects/grants: use "I found the concept/idea behind your work on [X] interesting" or "Your work on [X] caught my attention" (you don't have access to unpublished details)
+- Frame these as illustrative examples, NOT the only projects I want to join
+- If there is a natural connection between their research and CS skills (Data Engineering, Data Analysis, Machine Learning, Web Development, UX Design, etc.), mention how your background could be relevant
+- If the connection is unclear or forced, focus instead on your genuine interest in learning from their work and contributing in whatever capacity might be helpful
+- Do NOT create artificial connections or assume they need CS assistance if it's not evident from their research
+- Use learning-oriented language: "assist with", "contribute to", "support", "gain hands-on experience"
+- Do NOT use: "collaborate", "collaboration", "partner", "grants"
+- Do NOT ask about funding or open positions
+- Do NOT phrase as "I want to work on [specific project X]"
+- End with a soft ask that conveys interest in knowing about any opportunities to work as a volunteer
+  Example: "I would be grateful to know if there are any opportunities for me to contribute as a volunteer..."
+
+My fixed details (use verbatim):
+- Name: Bhanu Prakash Reddy Gundam (use "Bhanu" in greeting)
+- University: University of Florida (UF)
+- Graduated: December 2025
+- Degree: Graduate in Computer & Information Science
+- Professional interest: "I have a strong foundation in data engineering for building and managing analytical data pipelines, combined with experience in machine learning, and a keen interest in developing effective web applications and user-centered UX design."
+- Relevant coursework:
+  CIS6930 – NLP Applications (Grade: A), CAP5771 – Introduction to Data Science (Grade: A), CIS6930 – Data Engineering (Grade: A), CEN5728 – UX Design (Grade: A-)
+
+Here is the professor data:
+<INSERT PROFESSOR JSON HERE>

@@ -1,8 +1,7 @@
-import { useState, useMemo, useCallback, memo, useEffect } from 'react'
+import { useState, useMemo, useCallback, memo, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './App.css'
-import allData from './data.json'
-
-const ITEMS_PER_PAGE = 25
+import { fetchScholars, fetchScholarDetail, fetchFilterOptions } from './api'
 
 const DEPT_MAPPINGS = {
   'AG': 'College of Agricultural and Life Sciences',
@@ -41,197 +40,197 @@ const DEPT_MAPPINGS = {
 }
 
 function App() {
-  // Theme
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode')
-    return saved ? JSON.parse(saved) : false
-  })
 
-  // Apply theme to document
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
-    localStorage.setItem('darkMode', JSON.stringify(darkMode))
-  }, [darkMode])
+  // Load filters from localStorage
+  const loadFilters = () => {
+    const saved = localStorage.getItem('filters')
+    if (saved) {
+      const f = JSON.parse(saved)
+      return {
+        search: f.search || '',
+        minScore: f.minScore || '',
+        maxScore: f.maxScore || '',
+        minGrants: f.minGrants || '',
+        maxGrants: f.maxGrants || '',
+        reqSearch: f.reqSearch || '',
+        emailOnly: f.emailOnly || false,
+        selectedDepts: new Set(f.selectedDepts || []),
+        deptMode: f.deptMode || 'include',
+        selectedSubDepts: new Set(f.selectedSubDepts || []),
+        subDeptMode: f.subDeptMode || 'include',
+        selectedPositions: new Set(f.selectedPositions || []),
+        posMode: f.posMode || 'include'
+      }
+    }
+    return null
+  }
+
+  const initialFilters = loadFilters()
 
   // Filters
-  const [search, setSearch] = useState('')
-  const [minScore, setMinScore] = useState('')
-  const [maxScore, setMaxScore] = useState('')
-  const [minGrants, setMinGrants] = useState('')
-  const [reqSearch, setReqSearch] = useState('')
-  const [emailOnly, setEmailOnly] = useState(false)
+  const [search, setSearch] = useState(initialFilters?.search || '')
+  const [minScore, setMinScore] = useState(initialFilters?.minScore || '')
+  const [maxScore, setMaxScore] = useState(initialFilters?.maxScore || '')
+  const [minGrants, setMinGrants] = useState(initialFilters?.minGrants || '')
+  const [maxGrants, setMaxGrants] = useState(initialFilters?.maxGrants || '')
+  const [reqSearch, setReqSearch] = useState(initialFilters?.reqSearch || '')
+  const [emailOnly, setEmailOnly] = useState(initialFilters?.emailOnly || false)
 
   // Department filters
-  const [selectedDepts, setSelectedDepts] = useState(new Set())
-  const [deptMode, setDeptMode] = useState('include')
-  const [selectedSubDepts, setSelectedSubDepts] = useState(new Set())
-  const [subDeptMode, setSubDeptMode] = useState('include')
+  const [selectedDepts, setSelectedDepts] = useState(initialFilters?.selectedDepts || new Set())
+  const [deptMode, setDeptMode] = useState(initialFilters?.deptMode || 'include')
+  const [selectedSubDepts, setSelectedSubDepts] = useState(initialFilters?.selectedSubDepts || new Set())
+  const [subDeptMode, setSubDeptMode] = useState(initialFilters?.subDeptMode || 'include')
 
   // Position filter
-  const [selectedPositions, setSelectedPositions] = useState(new Set())
-  const [posMode, setPosMode] = useState('include')
+  const [selectedPositions, setSelectedPositions] = useState(initialFilters?.selectedPositions || new Set())
+  const [posMode, setPosMode] = useState(initialFilters?.posMode || 'include')
+
+  // Persist filters to localStorage
+  useEffect(() => {
+    const filters = {
+      search, minScore, maxScore, minGrants, maxGrants, reqSearch, emailOnly,
+      selectedDepts: [...selectedDepts],
+      deptMode,
+      selectedSubDepts: [...selectedSubDepts],
+      subDeptMode,
+      selectedPositions: [...selectedPositions],
+      posMode
+    }
+    localStorage.setItem('filters', JSON.stringify(filters))
+  }, [search, minScore, maxScore, minGrants, maxGrants, reqSearch, emailOnly,
+      selectedDepts, deptMode, selectedSubDepts, subDeptMode, selectedPositions, posMode])
 
   // UI state
   const [showMoreFilters, setShowMoreFilters] = useState(false)
-  const [showListModal, setShowListModal] = useState(false)
+  const navigate = useNavigate()
 
-  // Saved list (cart-like feature)
-  const [savedList, setSavedList] = useState(new Set())
+  // Saved list (cart-like feature) - persisted to localStorage
+  const [savedList, setSavedList] = useState(() => {
+    const saved = localStorage.getItem('savedList')
+    return saved ? new Set(JSON.parse(saved)) : new Set()
+  })
+
+  // Persist savedList to localStorage
+  useEffect(() => {
+    localStorage.setItem('savedList', JSON.stringify([...savedList]))
+  }, [savedList])
 
   // Pagination
   const [page, setPage] = useState(1)
 
   // Modal
   const [selected, setSelected] = useState(null)
+  const [modalLoading, setModalLoading] = useState(false)
 
-  // Clear all filters
-  const clearAllFilters = useCallback(() => {
-    setSearch('')
-    setMinScore('')
-    setMaxScore('')
-    setMinGrants('')
-    setReqSearch('')
-    setEmailOnly(false)
-    setSelectedDepts(new Set())
-    setSelectedSubDepts(new Set())
-    setSelectedPositions(new Set())
-    setDeptMode('include')
-    setSubDeptMode('include')
-    setPosMode('include')
-    setPage(1)
+  // API data state
+  const [scholars, setScholars] = useState([])
+  const [totalResults, setTotalResults] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Filter options from DB
+  const [allDepartments, setAllDepartments] = useState([])
+  const [allPositions, setAllPositions] = useState([])
+
+  // Debounce timer ref
+  const debounceRef = useRef(null)
+
+  // Fetch filter options on mount
+  useEffect(() => {
+    fetchFilterOptions()
+      .then(data => {
+        setAllDepartments(data.departments)
+        setAllPositions(data.positions)
+      })
+      .catch(err => console.error('Failed to load filter options:', err))
   }, [])
 
-  // List functions
-  const toggleSaved = useCallback((id) => {
-    setSavedList(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(id)) newSet.delete(id)
-      else newSet.add(id)
-      return newSet
-    })
-  }, [])
+  // Build filter params for API
+  const buildFilterParams = useCallback(() => {
+    const params = {}
+    if (search) params.search = search
+    if (minScore) params.minScore = minScore
+    if (maxScore) params.maxScore = maxScore
+    if (minGrants) params.minGrants = minGrants
+    if (maxGrants) params.maxGrants = maxGrants
+    if (reqSearch) params.reqSearch = reqSearch
+    if (emailOnly) params.emailOnly = true
 
-  const addAllFiltered = useCallback((filteredItems) => {
-    setSavedList(prev => {
-      const newSet = new Set(prev)
-      filteredItems.forEach(item => newSet.add(item.id))
-      return newSet
-    })
-  }, [])
+    // Convert department display names back to codes for API
+    if (selectedDepts.size > 0) {
+      const deptCodes = [...selectedDepts].map(d => d.split(' - ')[0].trim())
+      params.depts = deptCodes
+      params.deptMode = deptMode
+    }
+    if (selectedSubDepts.size > 0) {
+      params.subDepts = [...selectedSubDepts]
+      params.subDeptMode = subDeptMode
+    }
+    if (selectedPositions.size > 0) {
+      params.positions = [...selectedPositions]
+      params.posMode = posMode
+    }
+    return params
+  }, [search, minScore, maxScore, minGrants, maxGrants, reqSearch, emailOnly,
+      selectedDepts, deptMode, selectedSubDepts, subDeptMode, selectedPositions, posMode])
 
-  const removeFromList = useCallback((id) => {
-    setSavedList(prev => {
-      const newSet = new Set(prev)
-      newSet.delete(id)
-      return newSet
-    })
-  }, [])
+  // Fetch scholars when filters or page changes (debounced for text inputs)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
 
-  const clearList = useCallback(() => {
-    setSavedList(new Set())
-  }, [])
-
-  const downloadCSV = useCallback(() => {
-    const savedItems = allData.filter(item => savedList.has(item.id))
-    if (savedItems.length === 0) return
-
-    // CSV headers - includes all fields with nested data as JSON strings
-    const headers = [
-      'name', 'email', 'department', 'position', 'title',
-      'relevance_score', 'should_email', 'active_grants_count',
-      'active_grants_json', 'expired_grants_json', 'publications_json',
-      'possible_requirements', 'reasoning'
-    ]
-
-    // Build CSV content
-    const csvRows = [headers.join(',')]
-    savedItems.forEach(item => {
-      const row = [
-        `"${(item.name || '').replace(/"/g, '""')}"`,
-        `"${(item.email || '').replace(/"/g, '""')}"`,
-        `"${(item.department || '').replace(/"/g, '""')}"`,
-        `"${(item.position || '').replace(/"/g, '""')}"`,
-        `"${(item.title || '').replace(/"/g, '""')}"`,
-        item.relevance_score || 0,
-        `"${(item.should_email || '').replace(/"/g, '""')}"`,
-        item.active_grants_count || 0,
-        `"${JSON.stringify(item.active_grants || []).replace(/"/g, '""')}"`,
-        `"${JSON.stringify(item.expired_grants || []).replace(/"/g, '""')}"`,
-        `"${JSON.stringify(item.publications || []).replace(/"/g, '""')}"`,
-        `"${(item.requirements || []).join('; ').replace(/"/g, '""')}"`,
-        `"${(item.reasoning || []).join('; ').replace(/"/g, '""')}"`
-      ]
-      csvRows.push(row.join(','))
-    })
-
-    // Download
-    const csvContent = csvRows.join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `scholars_list_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  }, [savedList])
-
-  const downloadJSON = useCallback(() => {
-    const savedItems = allData.filter(item => savedList.has(item.id))
-    if (savedItems.length === 0) return
-
-    // Transform data to move possible_requirements and reasoning to end
-    const transformedItems = savedItems.map(item => {
-      const { requirements, reasoning, ...rest } = item
-      return {
-        ...rest,
-        possible_requirements: requirements,
-        reasoning: reasoning
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const params = buildFilterParams()
+        const result = await fetchScholars(params, page)
+        setScholars(result.data)
+        setTotalResults(result.total)
+        setTotalPages(result.totalPages)
+      } catch (err) {
+        console.error('Failed to fetch scholars:', err)
+        setError('Failed to load scholars. Is the server running?')
+      } finally {
+        setLoading(false)
       }
-    })
+    }, 300)
 
-    // Export complete data as JSON
-    const jsonContent = JSON.stringify(transformedItems, null, 2)
-    const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `scholars_list_${new Date().toISOString().split('T')[0]}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-  }, [savedList])
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [page, buildFilterParams])
 
-  // Parse departments and positions
-  const { departments, positions, deptToSubDepts } = useMemo(() => {
+  // Parse departments from DB data into display format
+  const { departments, deptToSubDepts } = useMemo(() => {
     const depts = new Set()
-    const pos = new Set()
-    const mapping = {} // mainDept (Display Name) -> Set of "MainDept-SubDept" strings
+    const mapping = {}
 
-    allData.forEach(item => {
-      if (item.department) {
-        const parts = item.department.split('-')
+    allDepartments.forEach(dept => {
+      if (dept) {
+        const parts = dept.split('-')
         const mainDeptCode = parts[0].trim()
         const subDept = parts.length > 1 ? parts.slice(1).join('-').trim() : null
 
         if (mainDeptCode) {
-          // Create nice display name: "CODE - College Name"
           const mappedName = DEPT_MAPPINGS[mainDeptCode]
           const displayName = mappedName ? `${mainDeptCode} - ${mappedName}` : mainDeptCode
 
           depts.add(displayName)
           if (!mapping[displayName]) mapping[displayName] = new Set()
-          // Store full "MainDept-SubDept" string for display
           if (subDept) mapping[displayName].add(`${mainDeptCode}-${subDept}`)
         }
       }
-      if (item.position) pos.add(item.position)
     })
 
     return {
       departments: Array.from(depts).sort(),
-      positions: Array.from(pos).sort(),
       deptToSubDepts: mapping
     }
-  }, [])
+  }, [allDepartments])
+
+  const positions = useMemo(() => allPositions.sort(), [allPositions])
 
   const availableSubDepts = useMemo(() => {
     if (selectedDepts.size === 0) {
@@ -246,66 +245,59 @@ function App() {
     return Array.from(subs).sort()
   }, [selectedDepts, deptToSubDepts])
 
-  // Filtering logic with parsed values
-  const filtered = useMemo(() => {
-    const searchLower = search.toLowerCase()
-    const reqLower = reqSearch.toLowerCase()
-    const minScoreVal = minScore === '' ? 0 : parseInt(minScore, 10) || 0
-    const maxScoreVal = maxScore === '' ? 100 : parseInt(maxScore, 10) || 100
-    const minGrantsVal = minGrants === '' ? 0 : parseInt(minGrants, 10) || 0
+  // Clear all filters
+  const clearAllFilters = useCallback(() => {
+    setSearch('')
+    setMinScore('')
+    setMaxScore('')
+    setMinGrants('')
+    setMaxGrants('')
+    setReqSearch('')
+    setEmailOnly(false)
+    setSelectedDepts(new Set())
+    setSelectedSubDepts(new Set())
+    setSelectedPositions(new Set())
+    setDeptMode('include')
+    setSubDeptMode('include')
+    setPosMode('include')
+    setPage(1)
+    localStorage.removeItem('filters')
+  }, [])
 
-    return allData.filter(item => {
-      if (search && !item.name.toLowerCase().includes(searchLower) &&
-        !(item.title || '').toLowerCase().includes(searchLower)) return false
+  // Reset entire app (clear all localStorage)
+  const resetApp = useCallback(() => {
+    if (window.confirm('Reset all app data? This will clear your saved list, filters, and copied items.')) {
+      localStorage.clear()
+      clearAllFilters()
+      setSavedList(new Set())
+      window.location.reload()
+    }
+  }, [clearAllFilters])
 
-      if (item.relevance_score < minScoreVal || item.relevance_score > maxScoreVal) return false
-      if (item.active_grants_count < minGrantsVal) return false
-      if (emailOnly && (item.should_email || '').toLowerCase() !== 'yes') return false
-
-      if (reqSearch) {
-        const hasMatch = item.requirements?.some(r => r.toLowerCase().includes(reqLower))
-        if (!hasMatch) return false
-      }
-
-      if (selectedDepts.size > 0) {
-        const parts = (item.department || '').split('-')
-        const mainDeptCode = parts[0].trim()
-        const mappedName = DEPT_MAPPINGS[mainDeptCode]
-        const displayName = mappedName ? `${mainDeptCode} - ${mappedName}` : mainDeptCode
-
-        const isSelected = selectedDepts.has(displayName)
-        if (deptMode === 'include' && !isSelected) return false
-        if (deptMode === 'exclude' && isSelected) return false
-      }
-
-      if (selectedSubDepts.size > 0) {
-        // Sub-depts are now stored as "MainDept-SubDept", so compare directly
-        const fullDept = (item.department || '').trim()
-        const isSelected = selectedSubDepts.has(fullDept)
-        if (subDeptMode === 'include' && !isSelected) return false
-        if (subDeptMode === 'exclude' && isSelected) return false
-      }
-
-      if (selectedPositions.size > 0) {
-        const isSelected = selectedPositions.has(item.position)
-        if (posMode === 'include' && !isSelected) return false
-        if (posMode === 'exclude' && isSelected) return false
-      }
-
-      return true
+  // List functions
+  const toggleSaved = useCallback((id) => {
+    setSavedList(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) newSet.delete(id)
+      else newSet.add(id)
+      return newSet
     })
-  }, [search, minScore, maxScore, minGrants, emailOnly, reqSearch,
-    selectedDepts, deptMode, selectedSubDepts, subDeptMode, selectedPositions, posMode])
+  }, [])
 
-  // Reset page when filters change
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
-  const currentPage = Math.min(page, totalPages || 1)
-
-  // Paginated results
-  const paginatedResults = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE
-    return filtered.slice(start, start + ITEMS_PER_PAGE)
-  }, [filtered, currentPage])
+  // Handle card click -> fetch full details for modal
+  const handleCardClick = useCallback(async (scholar) => {
+    setModalLoading(true)
+    setSelected({ ...scholar, _loading: true })
+    try {
+      const fullData = await fetchScholarDetail(scholar.id)
+      setSelected(fullData)
+    } catch (err) {
+      console.error('Failed to fetch scholar details:', err)
+      setSelected({ ...scholar, _error: true })
+    } finally {
+      setModalLoading(false)
+    }
+  }, [])
 
   const toggleSet = useCallback((set, setFn, value) => {
     const newSet = new Set(set)
@@ -323,13 +315,8 @@ function App() {
     if (isRemoving) {
       newDepts.delete(value)
 
-      // When unchecking a department, clear any sub-departments that belonged to it
-      // (and don't belong to any remaining selected departments)
       if (selectedSubDepts.size > 0) {
-        // Get sub-depts that belong to the removed department
         const removedDeptSubs = deptToSubDepts[value] || new Set()
-
-        // Get sub-depts that still belong to remaining selected departments
         const stillValidSubs = new Set()
         newDepts.forEach(d => {
           if (deptToSubDepts[d]) {
@@ -337,8 +324,6 @@ function App() {
           }
         })
 
-        // Keep only sub-depts that are still valid (belong to a remaining dept)
-        // OR if no depts are selected, all become valid
         if (newDepts.size > 0) {
           const newSubDepts = new Set()
           selectedSubDepts.forEach(s => {
@@ -348,7 +333,6 @@ function App() {
           })
           setSelectedSubDepts(newSubDepts)
         }
-        // If newDepts.size === 0, all subs are valid, keep current selections
       }
     } else {
       newDepts.add(value)
@@ -369,17 +353,19 @@ function App() {
         <h1>Gator Scholars</h1>
         <div className="header-right">
           <div className="header-stats">
-            Showing <strong>{paginatedResults.length}</strong> of {filtered.length} matches ({allData.length} total)
+            {loading ? 'Loading...' : (
+              <>Showing <strong>{scholars.length}</strong> of {totalResults} matches</>
+            )}
           </div>
-          <button className="list-badge" onClick={() => setShowListModal(true)}>
+          <button className="list-badge" onClick={() => navigate('/list')}>
             📋 View List {savedList.size > 0 && <span className="list-count">{savedList.size}</span>}
           </button>
           <button
-            className="theme-toggle"
-            onClick={() => setDarkMode(!darkMode)}
-            title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            className="reset-btn"
+            onClick={resetApp}
+            title="Reset App Data"
           >
-            {darkMode ? '☀️' : '🌙'}
+            ↻
           </button>
         </div>
       </header>
@@ -396,6 +382,10 @@ function App() {
               onChange={handleFilterChange(setSearch)}
             />
           </div>
+
+          <button className="clear-all-btn" onClick={clearAllFilters}>
+            🗑️ Clear All Filters
+          </button>
 
           <div className="filter-section">
             <label className="filter-label">Relevance Score Range</label>
@@ -426,16 +416,31 @@ function App() {
           </div>
 
           <div className="filter-section">
-            <label className="filter-label">Minimum Active Grants</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              className="filter-input"
-              placeholder="0"
-              value={minGrants}
-              onChange={handleFilterChange(setMinGrants)}
-            />
+            <label className="filter-label">Active Grants Range</label>
+            <div className="range-inputs">
+              <div className="range-input-group">
+                <span>Min:</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="0"
+                  value={minGrants}
+                  onChange={handleFilterChange(setMinGrants)}
+                />
+              </div>
+              <div className="range-input-group">
+                <span>Max:</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="∞"
+                  value={maxGrants}
+                  onChange={handleFilterChange(setMaxGrants)}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="filter-section">
@@ -491,31 +496,31 @@ function App() {
               onClear={() => { setSelectedPositions(new Set()); setPage(1) }}
             />
           )}
-
-          <button className="clear-all-btn" onClick={clearAllFilters}>
-            🗑️ Clear All Filters
-          </button>
         </aside>
 
         <main className="results">
-          {filtered.length === 0 ? (
+          {error ? (
+            <div className="empty-state">
+              <h3>⚠️ Connection Error</h3>
+              <p>{error}</p>
+            </div>
+          ) : loading ? (
+            <div className="empty-state">
+              <h3>Loading scholars...</h3>
+            </div>
+          ) : scholars.length === 0 ? (
             <div className="empty-state">
               <h3>No matches found</h3>
               <p>Try adjusting your filters</p>
             </div>
           ) : (
             <>
-              <div className="results-header">
-                <button className="select-all-btn" onClick={() => addAllFiltered(filtered)}>
-                  ➕ Add All Filtered ({filtered.length}) to List
-                </button>
-              </div>
               <div className="results-grid">
-                {paginatedResults.map(scholar => (
+                {scholars.map(scholar => (
                   <ScholarCard
                     key={scholar.id}
                     data={scholar}
-                    onClick={() => setSelected(scholar)}
+                    onClick={() => handleCardClick(scholar)}
                     isSaved={savedList.has(scholar.id)}
                     onToggleSave={() => toggleSaved(scholar.id)}
                   />
@@ -525,16 +530,16 @@ function App() {
               {totalPages > 1 && (
                 <div className="pagination">
                   <button
-                    disabled={currentPage === 1}
+                    disabled={page === 1}
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                   >
                     ← Prev
                   </button>
                   <span className="page-info">
-                    Page {currentPage} of {totalPages}
+                    Page {page} of {totalPages}
                   </span>
                   <button
-                    disabled={currentPage === totalPages}
+                    disabled={page === totalPages}
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   >
                     Next →
@@ -546,80 +551,7 @@ function App() {
         </main>
       </div>
 
-      {selected && <Modal data={selected} onClose={() => setSelected(null)} />}
-
-      {showListModal && (
-        <ListModal
-          savedList={savedList}
-          allData={allData}
-          onRemove={removeFromList}
-          onClear={clearList}
-          onDownloadCSV={downloadCSV}
-          onDownloadJSON={downloadJSON}
-          onClose={() => setShowListModal(false)}
-        />
-      )}
-    </div>
-  )
-}
-
-function ListModal({ savedList, allData, onRemove, onClear, onDownloadCSV, onDownloadJSON, onClose }) {
-  const savedItems = allData.filter(item => savedList.has(item.id))
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="list-modal" onClick={e => e.stopPropagation()}>
-        <div className="list-modal-header">
-          <h2>📋 Saved Scholars ({savedItems.length})</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-
-        <div className="list-modal-body">
-          {savedItems.length === 0 ? (
-            <div className="empty-state">
-              <h3>Your list is empty</h3>
-              <p>Add scholars using the + button on their cards</p>
-            </div>
-          ) : (
-            <table className="list-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Department</th>
-                  <th>Score</th>
-                  <th>Email</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {savedItems.map(item => (
-                  <tr key={item.id}>
-                    <td><strong>{item.name}</strong><br /><small>{item.title}</small></td>
-                    <td>{item.department}</td>
-                    <td>{item.relevance_score}</td>
-                    <td>{item.email || '-'}</td>
-                    <td>
-                      <button className="remove-btn" onClick={() => onRemove(item.id)}>✕</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="list-modal-footer">
-          <button className="clear-list-btn" onClick={onClear} disabled={savedItems.length === 0}>
-            🗑️ Clear
-          </button>
-          <button className="download-btn csv" onClick={onDownloadCSV} disabled={savedItems.length === 0}>
-            📄 CSV
-          </button>
-          <button className="download-btn json" onClick={onDownloadJSON} disabled={savedItems.length === 0}>
-            📦 JSON (Full)
-          </button>
-        </div>
-      </div>
+      {selected && <Modal data={selected} onClose={() => setSelected(null)} loading={modalLoading} />}
     </div>
   )
 }
@@ -639,16 +571,20 @@ const MultiSelectFilter = memo(function MultiSelectFilter({ label, items, select
       <div className="multi-header">
         <label className="filter-label">{label}</label>
         {selected.size > 0 && (
-          <button className="clear-btn" onClick={onClear}>Clear ({selected.size})</button>
+          <button className="clear-filter-btn" onClick={onClear}>
+            Clear ({selected.size})
+          </button>
         )}
       </div>
 
       <div className="mode-toggle">
-        <button className={`mode-btn ${mode === 'include' ? 'active' : ''}`} onClick={() => onModeChange('include')}>
-          ✓ Include
+        <button className={`mode-btn ${mode === 'include' ? 'active' : ''}`}
+          onClick={() => onModeChange('include')}>
+          ✅ Include
         </button>
-        <button className={`mode-btn ${mode === 'exclude' ? 'active' : ''}`} onClick={() => onModeChange('exclude')}>
-          ✗ Exclude
+        <button className={`mode-btn ${mode === 'exclude' ? 'active' : ''}`}
+          onClick={() => onModeChange('exclude')}>
+          ❌ Exclude
         </button>
       </div>
 
@@ -664,14 +600,14 @@ const MultiSelectFilter = memo(function MultiSelectFilter({ label, items, select
         {filteredItems.slice(0, expanded ? undefined : 6).map(item => (
           <label key={item} className="checkbox-item">
             <input type="checkbox" checked={selected.has(item)} onChange={() => onToggle(item)} />
-            <span>{item}</span>
+            {item}
           </label>
         ))}
       </div>
 
       {filteredItems.length > 6 && (
         <button className="expand-btn" onClick={() => setExpanded(!expanded)}>
-          {expanded ? 'Show Less' : `Show All (${filteredItems.length})`}
+          {expanded ? '▲ Show less' : `▼ Show all (${filteredItems.length})`}
         </button>
       )}
     </div>
@@ -717,7 +653,7 @@ const ScholarCard = memo(function ScholarCard({ data, onClick, isSaved, onToggle
         </div>
         <div className="info-item">
           <span>📄</span>
-          <strong>{data.publications?.length || 0}</strong> pubs
+          <strong>{data.publications_count ?? data.publications?.length ?? 0}</strong> pubs
         </div>
       </div>
 
@@ -763,7 +699,7 @@ function PublicationCard({ pub }) {
   )
 }
 
-function Modal({ data, onClose }) {
+function Modal({ data, onClose, loading }) {
   const [tab, setTab] = useState('grants')
 
   return (
@@ -778,114 +714,126 @@ function Modal({ data, onClose }) {
         </div>
 
         <div className="modal-body">
-          <div className="modal-section">
-            <div className="detail-grid">
-              <div className="detail-item">
-                <label>Email</label>
-                <span>{data.email || 'Not available'}</span>
-              </div>
-              <div className="detail-item">
-                <label>Position</label>
-                <span>{data.position || 'N/A'}</span>
-              </div>
-              <div className="detail-item">
-                <label>Relevance Score</label>
-                <span>{data.relevance_score}/100</span>
-              </div>
-              <div className="detail-item">
-                <label>Good Match</label>
-                <span>{data.should_email}</span>
-              </div>
+          {loading || data._loading ? (
+            <div className="empty-state" style={{ padding: '2rem' }}>
+              <h3>Loading details...</h3>
             </div>
-          </div>
-
-          {data.requirements && data.requirements.length > 0 && (
-            <div className="modal-section">
-              <h3>💻 Possible CS Requirements</h3>
-              <div className="card-tags">
-                {data.requirements.map((r, i) => (
-                  <span key={i} className="tag tag-req">{r}</span>
-                ))}
+          ) : data._error ? (
+            <div className="empty-state" style={{ padding: '2rem' }}>
+              <h3>⚠️ Failed to load details</h3>
+            </div>
+          ) : (
+            <>
+              <div className="modal-section">
+                <div className="detail-grid">
+                  <div className="detail-item">
+                    <label>Email</label>
+                    <span>{data.email || 'Not available'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Position</label>
+                    <span>{data.position || 'N/A'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Relevance Score</label>
+                    <span>{data.relevance_score}/100</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Good Match</label>
+                    <span>{data.should_email}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
 
-          {data.reasoning && data.reasoning.length > 0 && (
-            <div className="modal-section">
-              <h3>📝 Analysis Reasoning <span className="count">{data.reasoning.length}</span></h3>
-              <ul className="reasoning-list">
-                {data.reasoning.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="modal-section">
-            <div className="tabs">
-              <button className={`tab ${tab === 'grants' ? 'active' : ''}`} onClick={() => setTab('grants')}>
-                💰 Grants ({(data.active_grants?.length || 0) + (data.expired_grants?.length || 0)})
-              </button>
-              <button className={`tab ${tab === 'pubs' ? 'active' : ''}`} onClick={() => setTab('pubs')}>
-                📄 Publications ({data.publications?.length || 0})
-              </button>
-            </div>
-
-            {tab === 'grants' && (
-              <>
-                {data.active_grants?.length > 0 && (
-                  <>
-                    <h3 style={{ marginBottom: '0.75rem', color: 'var(--success)' }}>
-                      🟢 Active Grants <span className="count">{data.active_grants.length}</span>
-                    </h3>
-                    {data.active_grants.map((g, i) => (
-                      <div key={i} className="grant-card">
-                        <div className="grant-title">{g.title}</div>
-                        <div className="grant-meta">
-                          {g.funder_name && <span>🏢 {g.funder_name}</span>}
-                          {g.duration && <span> • 📅 {g.duration}</span>}
-                          {g.status && <span> • {g.status}</span>}
-                        </div>
-                      </div>
+              {data.requirements && data.requirements.length > 0 && (
+                <div className="modal-section">
+                  <h3>💻 Possible CS Requirements</h3>
+                  <div className="card-tags">
+                    {data.requirements.map((r, i) => (
+                      <span key={i} className="tag tag-req">{r}</span>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {data.reasoning && data.reasoning.length > 0 && (
+                <div className="modal-section">
+                  <h3>📝 Analysis Reasoning <span className="count">{data.reasoning.length}</span></h3>
+                  <ul className="reasoning-list">
+                    {data.reasoning.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="modal-section">
+                <div className="tabs">
+                  <button className={`tab ${tab === 'grants' ? 'active' : ''}`} onClick={() => setTab('grants')}>
+                    💰 Grants ({(data.active_grants?.length || 0) + (data.expired_grants?.length || 0)})
+                  </button>
+                  <button className={`tab ${tab === 'pubs' ? 'active' : ''}`} onClick={() => setTab('pubs')}>
+                    📄 Publications ({data.publications?.length || 0})
+                  </button>
+                </div>
+
+                {tab === 'grants' && (
+                  <>
+                    {data.active_grants?.length > 0 && (
+                      <>
+                        <h3 style={{ marginBottom: '0.75rem', color: 'var(--success)' }}>
+                          🟢 Active Grants <span className="count">{data.active_grants.length}</span>
+                        </h3>
+                        {data.active_grants.map((g, i) => (
+                          <div key={i} className="grant-card">
+                            <div className="grant-title">{g.title}</div>
+                            <div className="grant-meta">
+                              {g.funder_name && <span>🏢 {g.funder_name}</span>}
+                              {g.duration && <span> • 📅 {g.duration}</span>}
+                              {g.status && <span> • {g.status}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+
+                    {data.expired_grants?.length > 0 && (
+                      <>
+                        <h3 style={{ margin: '1rem 0 0.75rem', color: 'var(--text-muted)' }}>
+                          ⚪ Expired Grants <span className="count">{data.expired_grants.length}</span>
+                        </h3>
+                        {data.expired_grants.map((g, i) => (
+                          <div key={i} className="grant-card" style={{ opacity: 0.7 }}>
+                            <div className="grant-title">{g.title}</div>
+                            <div className="grant-meta">
+                              {g.funder_name && <span>🏢 {g.funder_name}</span>}
+                              {g.duration && <span> • 📅 {g.duration}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+
+                    {!data.active_grants?.length && !data.expired_grants?.length && (
+                      <p style={{ color: 'var(--text-muted)' }}>No grants found.</p>
+                    )}
                   </>
                 )}
 
-                {data.expired_grants?.length > 0 && (
+                {tab === 'pubs' && (
                   <>
-                    <h3 style={{ margin: '1rem 0 0.75rem', color: 'var(--text-muted)' }}>
-                      ⚪ Expired Grants <span className="count">{data.expired_grants.length}</span>
-                    </h3>
-                    {data.expired_grants.map((g, i) => (
-                      <div key={i} className="grant-card" style={{ opacity: 0.7 }}>
-                        <div className="grant-title">{g.title}</div>
-                        <div className="grant-meta">
-                          {g.funder_name && <span>🏢 {g.funder_name}</span>}
-                          {g.duration && <span> • 📅 {g.duration}</span>}
-                        </div>
-                      </div>
-                    ))}
+                    {data.publications?.length > 0 ? (
+                      data.publications.map((p, i) => (
+                        <PublicationCard key={i} pub={p} />
+                      ))
+                    ) : (
+                      <p style={{ color: 'var(--text-muted)' }}>No publications found.</p>
+                    )}
                   </>
                 )}
-
-                {!data.active_grants?.length && !data.expired_grants?.length && (
-                  <p style={{ color: 'var(--text-muted)' }}>No grants found.</p>
-                )}
-              </>
-            )}
-
-            {tab === 'pubs' && (
-              <>
-                {data.publications?.length > 0 ? (
-                  data.publications.map((p, i) => (
-                    <PublicationCard key={i} pub={p} />
-                  ))
-                ) : (
-                  <p style={{ color: 'var(--text-muted)' }}>No publications found.</p>
-                )}
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
