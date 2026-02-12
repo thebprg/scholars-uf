@@ -28,7 +28,7 @@ const distPath = path.join(__dirname, '..', 'dist')
 app.use(express.static(distPath))
 
 // SPA fallback — serve index.html for all non-API routes
-app.get('*', (req, res) => {
+app.get('/{*path}', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'))
 })
 
