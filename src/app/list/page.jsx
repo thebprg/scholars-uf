@@ -588,16 +588,16 @@ function ListPage() {
                         onClick={() => copyToClipboard(item)}
                         title={copiedIds.has(item.id) ? 'JSON Copied!' : 'Copy JSON'}
                       >
-                        {copiedIds.has(item.id) ? '✓' : '📋'}
+                        {copiedIds.has(item.id) ? 'copied' : 'copy data'}
                       </button>
                       <button
                         className={'prompt-btn ' + (promptCopiedIds.has(item.id) ? 'copied' : '')}
                         onClick={() => copyPromptToClipboard(item)}
                         title={promptCopiedIds.has(item.id) ? 'Prompt Copied!' : 'Copy Email Prompt'}
                       >
-                        {promptCopiedIds.has(item.id) ? '✓' : '✉️'}
+                        {promptCopiedIds.has(item.id) ? 'copied' : 'copy prompt'}
                       </button>
-                      <button className="remove-btn" onClick={() => removeFromList(item.id)} title="Remove">✕</button>
+                      <button className="remove-btn" onClick={() => removeFromList(item.id)} title="Remove">remove</button>
                     </div>
                   </td>
                 </tr>
