@@ -511,6 +511,167 @@ body {
 .empty-state { text-align: center; padding: 3rem 2rem; color: var(--text-muted); }
 .empty-state h3 { font-size: 1.2rem; margin-bottom: 0.4rem; }
 
+/* Disclaimer Modal */
+.disclaimer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1.5rem;
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.disclaimer-modal {
+  background: var(--card-bg);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  max-width: 500px;
+  width: 100%;
+  animation: modalIn 0.3s ease;
+  overflow: hidden;
+}
+
+.disclaimer-header {
+  background: linear-gradient(135deg, #1e3a5f 0%, #0f2544 100%);
+  color: white;
+  text-align: center;
+  padding: 1.75rem 2rem 1.5rem;
+}
+
+.disclaimer-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.disclaimer-header h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.2rem;
+}
+
+.disclaimer-subtitle {
+  font-size: 0.82rem;
+  opacity: 0.75;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.disclaimer-body {
+  padding: 1.5rem 1.75rem 0.5rem;
+}
+
+.disclaimer-body > p {
+  font-size: 0.88rem;
+  line-height: 1.7;
+  color: var(--text);
+  margin-bottom: 1.25rem;
+}
+
+.disclaimer-warning {
+  background: #fefcf3;
+  border: 1px solid #e9daab;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.disclaimer-warning-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.disclaimer-warning-icon {
+  font-size: 1rem;
+  color: #b8860b;
+}
+
+.disclaimer-warning-header strong {
+  font-size: 0.85rem;
+  color: #6b4f09;
+  letter-spacing: 0.01em;
+}
+
+.disclaimer-warning ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.disclaimer-warning li {
+  font-size: 0.82rem;
+  color: #5c4a1e;
+  line-height: 1.6;
+  padding-left: 1.1rem;
+  position: relative;
+}
+
+.disclaimer-warning li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: #c4a035;
+  font-weight: 700;
+}
+
+.disclaimer-footer {
+  padding: 1rem 1.75rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.disclaimer-accept-btn {
+  background: linear-gradient(135deg, #1e3a5f 0%, #0f2544 100%);
+  color: white;
+  border: none;
+  padding: 0.7rem 2rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  width: 100%;
+  letter-spacing: 0.01em;
+}
+
+.disclaimer-accept-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(15, 37, 68, 0.35);
+}
+
+.disclaimer-accept-btn:active {
+  transform: translateY(0);
+}
+
+.disclaimer-credit {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.disclaimer-credit a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: bold;
+  font-size: larger;
+  text-underline-offset: 2px;
+}
+
+.disclaimer-credit a:hover {
+  color: var(--primary);
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;

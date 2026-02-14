@@ -75,6 +75,7 @@ function App() {
   // in the NEXT render cycle when state actually holds hydrated values.
   const [hasHydrated, setHasHydrated] = useState(false)
   const [showMobileSidebar, setShowMobileSidebar] = useState(false)
+  const [showDisclaimer, setShowDisclaimer] = useState(false)
 
   // Hydrate all localStorage state after mount (client-only)
   useEffect(() => {
@@ -100,6 +101,11 @@ function App() {
     // Hydrate saved list
     const sl = localStorage.getItem('savedList')
     if (sl) setSavedList(new Set(JSON.parse(sl)))
+
+    // Show disclaimer on first visit
+    if (!localStorage.getItem('disclaimerAccepted')) {
+      setShowDisclaimer(true)
+    }
 
     // Triggers a new render — persistence effects will see hydrated values
     setHasHydrated(true)
@@ -592,6 +598,54 @@ function App() {
       </div>
 
       {selected && <Modal data={selected} onClose={() => setSelected(null)} loading={modalLoading} />}
+
+      {showDisclaimer && (
+        <div className="disclaimer-overlay" onClick={() => { setShowDisclaimer(false); localStorage.setItem('disclaimerAccepted', 'true') }}>
+          <div className="disclaimer-modal" onClick={e => e.stopPropagation()}>
+            <div className="disclaimer-header">
+              <div className="disclaimer-icon">🐊</div>
+              <h2>Gator Scholars</h2>
+              <p className="disclaimer-subtitle">Research Discovery &amp; Collaboration Tool</p>
+            </div>
+
+            <div className="disclaimer-body">
+              <p>
+                Gator Scholars helps you browse faculty research profiles at the University
+                of Florida — including publications, grants, and areas of expertise — to
+                identify professors whose work aligns with your academic interests for
+                potential research collaboration.
+              </p>
+
+              <div className="disclaimer-warning">
+                <div className="disclaimer-warning-header">
+                  <span className="disclaimer-warning-icon">⚠</span>
+                  <strong>Responsible Use Policy</strong>
+                </div>
+                <ul>
+                  <li>Do not use this tool to spam or harass faculty members.</li>
+                  <li>All outreach must be professional, relevant, and respectful of professors' time.</li>
+                  <li>This platform is intended solely for genuine academic and research purposes.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="disclaimer-footer">
+              <button
+                className="disclaimer-accept-btn"
+                onClick={() => { setShowDisclaimer(false); localStorage.setItem('disclaimerAccepted', 'true') }}
+              >
+                I Agree &amp; Continue
+              </button>
+              <p className="disclaimer-credit">
+                View Code & Pipeline on{' '}
+                <a href="https://github.com/thebprg/pros-uf" target="_blank" rel="noopener noreferrer">
+                  GitHub
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
