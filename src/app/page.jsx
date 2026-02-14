@@ -76,6 +76,7 @@ function App() {
   const [hasHydrated, setHasHydrated] = useState(false)
   const [showMobileSidebar, setShowMobileSidebar] = useState(false)
   const [showDisclaimer, setShowDisclaimer] = useState(false)
+  const [disclaimerCountdown, setDisclaimerCountdown] = useState(5)
 
   // Hydrate all localStorage state after mount (client-only)
   useEffect(() => {
@@ -110,6 +111,13 @@ function App() {
     // Triggers a new render — persistence effects will see hydrated values
     setHasHydrated(true)
   }, [])
+
+  // Disclaimer countdown timer — disables accept button for 5 seconds
+  useEffect(() => {
+    if (!showDisclaimer || disclaimerCountdown <= 0) return
+    const timer = setTimeout(() => setDisclaimerCountdown(c => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [showDisclaimer, disclaimerCountdown])
 
   // Debounced localStorage persistence for filters (only after hydration render)
   const filterPersistRef = useRef(null)
@@ -600,8 +608,8 @@ function App() {
       {selected && <Modal data={selected} onClose={() => setSelected(null)} loading={modalLoading} />}
 
       {showDisclaimer && (
-        <div className="disclaimer-overlay" onClick={() => { setShowDisclaimer(false); localStorage.setItem('disclaimerAccepted', 'true') }}>
-          <div className="disclaimer-modal" onClick={e => e.stopPropagation()}>
+        <div className="disclaimer-overlay">
+          <div className="disclaimer-modal">
             <div className="disclaimer-header">
               <div className="disclaimer-icon">🐊</div>
               <h2>Gator Scholars</h2>
@@ -631,10 +639,11 @@ function App() {
 
             <div className="disclaimer-footer">
               <button
-                className="disclaimer-accept-btn"
+                className={`disclaimer-accept-btn${disclaimerCountdown > 0 ? ' disabled' : ''}`}
+                disabled={disclaimerCountdown > 0}
                 onClick={() => { setShowDisclaimer(false); localStorage.setItem('disclaimerAccepted', 'true') }}
               >
-                I Agree &amp; Continue
+                {disclaimerCountdown > 0 ? `Please read (${disclaimerCountdown}s)` : 'I Agree & Continue'}
               </button>
               <p className="disclaimer-credit">
                 View Code & Pipeline on{' '}

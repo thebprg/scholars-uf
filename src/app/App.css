@@ -654,6 +654,13 @@ body {
   transform: translateY(0);
 }
 
+.disclaimer-accept-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .disclaimer-credit {
   font-size: 0.72rem;
   color: var(--text-muted);
